@@ -82,3 +82,6 @@ fi
     println!("askPass.sh created as: {:?}", askpass_path);
     Ok(askpass_path)
 }
+
+// dari pada kaya gitu ribet kenapa ngga di awal installasi diminta langsung data github nya
+// mulai dari user.email user.name sama token nya

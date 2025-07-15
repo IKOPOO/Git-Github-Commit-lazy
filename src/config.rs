@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::{error, fs, io::Write, path::Path, process::Command, vec};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+
+// saving data project
 pub struct Project {
     pub name: String,
     pub path: String,
@@ -13,6 +15,7 @@ pub struct Project {
 }
 
 impl Project {
+    // membuat direktori
     pub fn create_dir(&self) {
         match fs::create_dir(&self.path) {
             Ok(_) => {
@@ -24,6 +27,7 @@ impl Project {
         }
     }
 
+    // membuka project
     pub fn open_project(&self) {
         Command::new("code")
             .arg(&self.path)
@@ -31,6 +35,7 @@ impl Project {
             .expect("gagal dalam membuka proyek");
     }
 
+    // load project/membaca project yang sudah pernah dibuat
     pub fn load_data_project() -> Vec<Project> {
         const FILE_PATH: &'static str = "project_data.json";
         if Path::new(FILE_PATH).exists() {
@@ -41,6 +46,7 @@ impl Project {
         }
     }
 
+    // menyimpan informasi project
     pub fn save_project_data(project: &[Project]) -> Result<(), Box<dyn error::Error>> {
         const FILE_PATH: &'static str = "project_data.json";
         let json_data = serde_json::to_string_pretty(project).unwrap();

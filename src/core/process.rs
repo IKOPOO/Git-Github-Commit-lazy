@@ -1,15 +1,12 @@
 use lazy_static::lazy_static;
-use std::error::Error;
-use std::os::unix::raw::pid_t;
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::sync::{Arc, RwLock, RwLock};
+use std::sync::{Arc, RwLock};
+use std::thread;
 use std::time::Duration;
-use std::{thread, vec};
 
 // crate yang digunakan
 use super::{cmd_command, watch_proces};
 use crate::config::Project;
-use crate::core;
 
 pub enum MonitorEvent {
     AddProject(Project),
@@ -24,7 +21,8 @@ pub(crate) struct ProcessMonitor {
 }
 
 impl ProcessMonitor {
-    fn new() -> Self {
+    // constructor
+    fn new() -> Arc<Self> {
         let (tx, rx): (Sender<MonitorEvent>, Receiver<MonitorEvent>) = mpsc::channel();
         let project = Arc::new(RwLock::new(Vec::new()));
         let pid = Arc::new(RwLock::new(Vec::new()));
@@ -32,24 +30,28 @@ impl ProcessMonitor {
         let monitor = Arc::new(Self {
             project: project.clone(),
             pids: pid.clone(),
-            sender: tx,
+            sender: tx.clone(),
         });
 
-        let monitor_clone = monitor.clone();
-        thread::spawn(move || ProcessMonitor::monitor_all(rx, monitor_clone));
+        let monitor_clone = Arc::clone(&monitor);
+        thread::spawn(move || {
+            ProcessMonitor::monitor_all(rx, monitor_clone);
+        });
 
         monitor
     }
 
     // fungsi menambahkan data project baru dan data PID baru
-    fn add_project(project: Project, projects: &mut Vec<Project>, pids: &mut Vec<Vec<u32>>) {
+    fn add_project(&self, project: Project) {
+        let mut projects = self.project.write().unwrap();
+        let mut pids = self.pids.write().unwrap();
+
         projects.push(project);
 
         if let Some(p) = projects.last().map(|p| p.path.clone()) {
             let pids_lock = watch_proces::find_pid_by_path(p);
             pids.push(pids_lock);
-        }
-
+        };
         // sekedar validasi untuk melihat apakah data berhasi disimpan atau tidak
         println!("daftar proyek saat ini ");
         for p in projects.iter() {
@@ -61,9 +63,9 @@ impl ProcessMonitor {
         }
     }
 
-    fn delete_and_push(index: usize, monitor: &Arc<Self>) {
-        let mut projects = monitor.project.write().unwrap();
-        let mut pids = monitor.pids.write().unwrap();
+    fn delete_and_push(&self, index: usize) {
+        let mut projects = self.project.write().unwrap();
+        let mut pids = self.pids.write().unwrap();
 
         if index < projects.len() {
             // menghapus project dan mengembalikan datanya untuk di push
@@ -99,15 +101,74 @@ impl ProcessMonitor {
     }
 
     // fungsi untuk memantau semua group PID
-    pub fn monitor_all(rx: Receiver<MonitorEvent>, monitor: &Arc<Self>) {
+    fn monitor_all(rx: Receiver<MonitorEvent>, monitor: Arc<Self>) {
+        println!("🟢 monitoring thread dimulai");
         loop {
-            match rx.recv() {
-                Ok(event) => match event {
+            while let Ok(event) = rx.try_recv() {
+                match event {
                     MonitorEvent::AddProject(project) => {
-                        Self::handle_add_project(project, &monitor);
+                        monitor.add_project(project);
                     }
-                },
+                    MonitorEvent::RemoveProject(index) => {
+                        monitor.delete_and_push(index);
+                    }
+                    MonitorEvent::Shutdown => {
+                        println!("Shutting down monitoring...");
+                        return;
+                    }
+                }
             }
+            {
+                let pids = monitor.pids.read().unwrap();
+                let projects = monitor.project.read().unwrap();
+
+                let mut index_to_remove = vec![];
+
+                for (i, pid_group) in pids.iter().enumerate() {
+                    match watch_proces::monitor_check(i, pid_group) {
+                        Ok(true) => {
+                            // do nothing because process is still running
+                        }
+                        Ok(false) => {
+                            // hapus pid dan project yang tidak berjalan lagi
+                            println!("❌ Proses project index {i} mati. Akan dihapus & push.");
+                            index_to_remove.push(i);
+                        }
+                        Err(e) => {
+                            eprintln!("⚠️ Gagal memantau proses di index {i}: {:?}", e);
+                        }
+                    }
+                }
+
+                drop(projects);
+                drop(pids);
+
+                for &i in index_to_remove.iter().rev() {
+                    monitor.delete_and_push(i);
+                }
+            }
+
+            thread::sleep(Duration::from_secs(5));
         }
     }
+}
+
+// yang di panggil itu kode yang ini
+lazy_static! {
+    pub(crate) static ref MONITOR_PROCES: Arc<ProcessMonitor> = ProcessMonitor::new();
+}
+
+// pub fn start_monitoring() {
+//     let monitor = MONITOR_PROCES.clone();
+//     thread::spawn(move || {
+//         let rx = monitor.sender.clone();
+//         ProcessMonitor::monitor_all(rx, monitor);
+//     });
+// }
+pub fn add_project_to_monitor(project: Project) {
+    MONITOR_PROCES.handle_add_project(project);
+}
+
+pub fn remove_project_from_monitoring(index: usize) {
+    MONITOR_PROCES.handle_remove_project(index);
 }
