@@ -1,4 +1,5 @@
 pub mod cmd_command;
+pub mod log_global;
 pub mod melanjutkan;
 pub mod new;
 pub mod process;
