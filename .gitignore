@@ -2,6 +2,6 @@
 project_data.json
 /.vscode/
 /.config/
-.env
-program.log
+/.env
+/program.log
 
