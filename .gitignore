@@ -1,7 +1,7 @@
 /target
 project_data.json
-/.vscode
-/.config
+/.vscode/
+/.config/
 .env
 program.log
 
