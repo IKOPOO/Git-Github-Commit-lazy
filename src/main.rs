@@ -5,9 +5,12 @@ mod github;
 mod log;
 mod menu;
 
+use std::f32::consts::E;
+
+use nix::libc::user;
 use tokio;
 
-use crate::core::log_global::log_global;
+use crate::core::log_global::{self, init_global_log, log_global};
 use crate::github::{
   auth::{self, auth_user},
   client::UserGithub,
@@ -15,17 +18,26 @@ use crate::github::{
 use crate::log::{LogType, Logger};
 #[tokio::main]
 async fn main() {
-  // // inisialisasi logger di awal program
-  // let logger = Logger::new("program.log");
-  // GLOBAL_LOGGER
-  //   .set(Arc::new(logger))
-  //   .expect("Failed to set global logger");
+  if let Err(e) = init_global_log().await {
+    eprintln!("Failed to initialize Log : {}", e);
+    return;
+  }
 
-  log_global(LogType::Info, "Program dimulai", false);
+  log_global(LogType::Info, "Program Dimulai", false);
 
-  let auth_result = auth_user().await;
-  println!("hasil authentikasi: {:?}", auth_result);
-  let _ = UserGithub::write_user(auth_result.expect("gagal nulis wok tanganku sakit"));
-  let mut aplication = app::App::new();
-  aplication.run();
+  match auth_user().await {
+    Ok(user) => {
+      println!("Hasil autentikasi: {:?}", user);
+
+      if let Err(e) = UserGithub::write_user(user) {
+        log_global(LogType::Error, &format!("Gagal Menulis User : {}", e), true);
+      }
+
+      let mut application = app::App::new();
+      application.run();
+    }
+    Err(e) => {
+      log_global(LogType::Error, &format!("Authentikasi Gagal : {}", e), true);
+    }
+  }
 }

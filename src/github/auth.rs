@@ -1,19 +1,18 @@
 use anyhow::{anyhow, Result};
 use dirs;
 use octocrab::Octocrab;
+use std::fs;
 use std::fs::File;
-use std::io::{self, stdin, stdout, Write};
+use std::io::{stdin, stdout, Write};
 use std::path::Path;
-use std::{env, fs, path, result};
 
-use crate::config;
 use crate::github::client::*;
 use crate::github::github;
 
 pub async fn get_token_create_client(user_token: Option<String>) -> Result<Octocrab> {
   let token = match user_token {
     Some(t) => {
-      let folder_path = dirs::config_dir().unwrap().join(".config/myapp");
+      let folder_path = dirs::config_dir().unwrap().join("myapp");
       fs::create_dir_all(&folder_path)?;
 
       let file_path = Path::new(&folder_path).join("token.txt");
@@ -24,7 +23,7 @@ pub async fn get_token_create_client(user_token: Option<String>) -> Result<Octoc
     }
     None => {
       let config_dir = dirs::config_dir().ok_or_else(|| anyhow!("Path tidak bisa didapatkan"))?;
-      let folder_path = config_dir.join("myaap");
+      let folder_path = config_dir.join("myapp");
       let file_path = folder_path.join("token.txt");
       let isi = fs::read_to_string(&file_path)?;
       isi

@@ -1,12 +1,11 @@
 use chrono::Local;
 use colored::*;
 use std::fs::{File, OpenOptions};
-use std::io::{self, BufWriter, Write};
-use std::sync::{Arc, Mutex};
-
-use crate::log;
+use std::io::Write;
+use std::sync::Mutex;
 
 // tipe log yang dikeluarkan
+#[derive(Debug, Clone, Copy)]
 pub enum LogType {
   Info,
   Warn,

@@ -1,7 +1,7 @@
 use anyhow::Ok;
 use chrono::DateTime;
 use serde::{Deserialize, Serialize};
-use std::{fs, io::Write};
+use std::{fs, io::Write, path::Path};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct UserGithub {
@@ -23,9 +23,12 @@ impl UserGithub {
   }
 
   pub fn write_user(user: UserGithub) -> Result<(), anyhow::Error> {
-    const FILE_PATH: &'static str = ".config/user.json";
-    let json_data = serde_json::to_string_pretty(&user).unwrap();
-    let mut file = fs::File::create(FILE_PATH)?;
+    let config_dir = Path::new(".config");
+    fs::create_dir(config_dir)?;
+
+    let file_path = config_dir.join("user.json");
+    let json_data = serde_json::to_string_pretty(&user)?;
+    let mut file = fs::File::create(file_path)?;
     file.write_all(json_data.as_bytes())?;
 
     Ok(())
